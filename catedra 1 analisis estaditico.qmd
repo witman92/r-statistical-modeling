@@ -1,0 +1,1241 @@
+---
+title: "CATEDRA Analisis Estadıstico (AES1018)"
+author: "WITMAN ZAVALA"
+format: pdf
+editor: visual
+---
+
+## 1.-EJERCICIOS
+
+1.  Los datos Estudiantes.xlsx fueron recogidos aplicando una encuesta a una muestra de estudiantes universitarios, y corresponde a un dataframe con 400 observaciones y 18 variables, las cuales se describen en el mismo archivo. Realize un an´alisis descriptivo pertinente de las variables y comentando en cada caso, incluyendo:
+
+a\) \[0.5 pts\] Gr´aficos.
+
+b\) \[0.5 pts\] Tablas.
+
+c\) \[1 pto\] Estad´ıgrafos.
+
+Para su analisis, considere los siguientes pasos: 1) Clasificar las variables seg´un su tipo (cualitativa/cuantitativa, discreta/continua); 2) construir una tabla de frecuencias para una variable cuantitativa; 3) elaborar al menos dos gr´aficos representativos (histograma, diagrama de caja, gr´afico de barras, etc.); 4) calcular las medidas de tendencia central (media, mediana, moda) y dispersi´on (rango, desviaci´on est´andar, varianza), as´ı como el coeficiente de variacion; 5) calcular las medidas de forma (asimetr´ıa y curtosis); e 6) identificar posibles outliers mediante an´alisis gr´afico y cuantitativo..
+
+```{r}
+# Asegúrate de tener las librerías necesarias
+# install.packages("googledrive")
+# install.packages("readxl")
+library(googledrive)
+library(readxl)
+
+# Define el enlace público al archivo
+# Debes obtener este enlace desde Google Drive
+file_link <- "https://docs.google.com/spreadsheets/d/17Ubr4xzUVdiO7bCpcv_z8GWKuNurC_zV/edit?usp=sharing&ouid=116815086141776006827&rtpof=true&sd=true"
+
+# Descargar el archivo usando el enlace público
+temp_file <- tempfile(fileext = ".xlsx")
+googledrive::drive_download(file = as_id(file_link), path = temp_file, overwrite = TRUE)
+
+# Definir el nombre de la hoja
+sheet_name <- "Hoja1" # Especificar el nombre de la hoja que quieres cargar
+
+# Leer la hoja especificada del archivo Excel temporal
+df <- readxl::read_excel(temp_file, sheet =sheet_name)
+
+# Limpiar el archivo temporal
+unlink(temp_file)
+```
+
+## solucion
+
+1\) Clasificar las variables segun su tipo (cualitativa/cuantitativa, discreta/continua)
+
+```{r}
+# 1) Clasificar las variables segun su tipo (cualitativa/cuantitativa, discreta/continua)  crear una tabla
+
+# Analizar las variables y clasificarlas
+variable_types <- data.frame(
+  Variable = names(df),
+  Tipo_General = sapply(df, function(x) ifelse(is.numeric(x), "Cuantitativa", "Cualitativa")),
+  Tipo_Especifico = sapply(df, function(x) {
+    if (is.numeric(x)) {
+      if (all(x == floor(x), na.rm = TRUE)) {
+        "Discreta" # Asumimos discreta si todos los valores son enteros
+      } else {
+        "Continua"
+      }
+    } else {
+      "Nominal" # O "Ordinal" si se conoce el orden
+    }
+  })
+)
+
+# Mostrar la tabla de clasificacion
+variable_types
+```
+
+2\) construir una tabla de frecuencias para una variable cuantitativa
+
+```{r}
+# 2) construir una tabla ordenada de frecuencias para una variable cuantitativa   de puntaje
+
+# Asumiendo que 'Puntaje' es el nombre de la columna cuantitativa de puntaje
+# Reemplaza 'Puntaje' con el nombre real de tu columna si es diferente
+puntaje_data <- df$Puntaje
+
+# Eliminar valores NA si existen
+puntaje_data <- puntaje_data[!is.na(puntaje_data)]
+
+# Ordenar los datos
+puntaje_ordenado <- sort(puntaje_data)
+
+# Crear una tabla de frecuencias
+tabla_frecuencias <- as.data.frame(table(puntaje_ordenado))
+colnames(tabla_frecuencias) <- c("Puntaje", "Frecuencia")
+
+# Calcular frecuencias relativas
+tabla_frecuencias$Frecuencia_Relativa <- tabla_frecuencias$Frecuencia / sum(tabla_frecuencias$Frecuencia)
+
+# Calcular frecuencias acumuladas
+tabla_frecuencias$Frecuencia_Acumulada <- cumsum(tabla_frecuencias$Frecuencia)
+
+# Calcular frecuencias relativas acumuladas
+tabla_frecuencias$Frecuencia_Relativa_Acumulada <- cumsum(tabla_frecuencias$Frecuencia_Relativa)
+
+# Mostrar la tabla de frecuencias ordenada
+tabla_frecuencias
+```
+
+3\) elaborar al menos dos graficos representativos (histograma, diagrama de caja, grafico de barras, etc.)
+
+```{r}
+# 3) elaborar al menos dos graficos representativos (histograma, diagrama de caja, grafico debarras, etc.) facil de entender
+
+library(ggplot2)
+
+# Histograma de la variable 'Puntaje'
+# Asegúrate de que la columna 'Puntaje' sea numérica
+df$Puntaje <- as.numeric(df$Puntaje)
+
+ggplot(df, aes(x = Puntaje)) +
+  geom_histogram(binwidth = 5, fill = "skyblue", color = "black") +
+  labs(title = "Distribución de Puntajes", x = "Puntaje", y = "Frecuencia") +
+  theme_minimal()
+
+# Diagrama de caja de la variable 'Puntaje'
+ggplot(df, aes(y = Puntaje)) +
+  geom_boxplot(fill = "lightgreen") +
+  labs(title = "Diagrama de Caja de Puntajes", y = "Puntaje") +
+  theme_minimal()
+```
+
+4\) calcular las medidas de tendencia central (media, mediana, moda) y dispersion (rango, desviacion estandar, varianza), ası como el coeficiente de variacion;
+
+```{r}
+# Define the function to analyze a variable
+analizar_variable <- function(dataframe, var_name) {
+  # Check if the column exists
+  if (!(var_name %in% names(dataframe))) {
+    message("Error: La columna '", var_name, "' no existe en el dataframe.")
+    return(NULL)
+  }
+
+  # Get the data for the specified variable
+  data_var <- dataframe[[var_name]]
+
+  # Remove NA values
+  data_clean <- data_var[!is.na(data_var)]
+
+  # Check if there are enough non-NA values
+  if (length(data_clean) == 0) {
+    message("Advertencia: La columna '", var_name, "' no tiene datos válidos para analizar.")
+    return(NULL)
+  }
+
+  message("\n--- Análisis Descriptivo para '", var_name, "' ---")
+
+  # Clasificar el tipo de variable (simple heurística basada en datos limpios)
+  is_numeric <- is.numeric(data_clean)
+  is_discrete <- FALSE
+
+  if (is_numeric) {
+      # Consider discrete if all are integers and number of unique values is small relative to count
+      if (all(data_clean == floor(data_clean)) && length(unique(data_clean)) / length(data_clean) < 0.1) {
+          is_discrete <- TRUE
+      }
+  }
+
+
+  # a) Gráficos
+  message("\n--- Gráficos ---")
+  if (is_numeric) {
+    # Convert to numeric if it wasn't already (handling potential factors/characters)
+    data_numeric <- as.numeric(data_clean)
+    
+    # Check if the conversion resulted in NAs and inform the user
+    if(any(is.na(data_numeric) & !is.na(data_clean))) {
+        warning(paste0("Advertencia: Algunos valores en '", var_name, "' no pudieron ser convertidos a numérico y fueron tratados como NA para el análisis numérico."))
+    }
+
+    # Plot based on discreteness
+    if (is_discrete) {
+        message("Graficando como variable discreta (geom_bar).")
+        # Use geom_bar for discrete numerical data
+         p1 <- ggplot(data.frame(Valor = factor(data_numeric)), aes(x = Valor)) +
+          geom_bar(fill = "skyblue", color = "black", alpha = 0.7) +
+          labs(title = paste("Distribución de", var_name), x = var_name, y = "Frecuencia") +
+          theme_minimal() +
+          theme(axis.text.x = element_text(angle = 45, hjust = 1)) # Rotate labels for many discrete values
+        print(p1)
+    } else {
+        message("Graficando como variable continua (geom_histogram y geom_density).")
+        # Histogram
+        p1 <- ggplot(data.frame(Valor = data_numeric), aes(x = Valor)) +
+          geom_histogram(binwidth = diff(range(data_numeric, na.rm=TRUE))/30, fill = "skyblue", color = "black", alpha = 0.7) + # Dynamic binwidth
+          labs(title = paste("Histograma de", var_name), x = var_name, y = "Frecuencia") +
+          theme_minimal()
+        print(p1)
+
+        # Density plot
+        p2 <- ggplot(data.frame(Valor = data_numeric), aes(x = Valor)) +
+          geom_density(fill = "purple", alpha = 0.6) +
+          labs(title = paste("Gráfico de Densidad de", var_name), x = var_name, y = "Densidad") +
+          theme_minimal()
+        print(p2)
+    }
+
+
+    # Boxplot (useful for visualizing distribution and outliers regardless of discreteness)
+    p3 <- ggplot(data.frame(Valor = data_numeric), aes(y = Valor)) +
+      geom_boxplot(fill = "lightgreen") +
+      labs(title = paste("Diagrama de Caja de", var_name), y = var_name) +
+      theme_minimal()
+    print(p3)
+
+  } else {
+    # For qualitative variables, use bar plot
+    message("Graficando como variable cualitativa (geom_bar).")
+    p1 <- ggplot(data.frame(Valor = as.factor(data_clean)), aes(x = Valor)) +
+      geom_bar(fill = "salmon", color = "black", alpha = 0.7) +
+      labs(title = paste("Distribución de", var_name), x = var_name, y = "Frecuencia") +
+      theme_minimal()
+    print(p1)
+  }
+
+
+  # b) Tablas (Frecuencia)
+  message("\n--- Tablas de Frecuencia ---")
+  if (length(unique(data_clean)) <= 50) { # Limit table size for many unique values
+      freq_table <- as.data.frame(table(data_clean))
+      colnames(freq_table) <- c(var_name, "Frecuencia")
+      freq_table$Frecuencia_Relativa <- freq_table$Frecuencia / sum(freq_table$Frecuencia)
+      # Optional: Add cumulative frequencies for ordered data types
+      print(freq_table)
+  } else {
+      message("La columna tiene demasiados valores únicos (", length(unique(data_clean)), ") para mostrar una tabla de frecuencias completa.")
+      # Show a summary or top values instead
+      print(summary(data_clean))
+  }
+
+
+  # c) Estadígrafos (Solo para variables numéricas)
+  stats <- list()
+  if (is_numeric) {
+    message("\n--- Estadígrafos ---")
+    data_numeric <- as.numeric(data_clean) # Ensure numeric after filtering NA
+
+    # Medidas de tendencia central
+    stats$media <- mean(data_numeric, na.rm = TRUE)
+    stats$mediana <- median(data_numeric, na.rm = TRUE)
+    # Moda (puede haber múltiples modas)
+    moda_val <- table(data_numeric)
+    max_freq <- max(moda_val)
+    stats$moda <- as.numeric(names(moda_val[moda_val == max_freq]))
+    if(length(stats$moda) > 5) stats$moda <- "Múltiples modas (más de 5)" # Prevent printing too many modas
+
+
+    message("Media: ", round(stats$media, 4))
+    message("Mediana: ", stats$mediana)
+    message("Moda: ", paste(stats$moda, collapse = ", "))
+
+
+    # Medidas de dispersión
+    stats$rango <- range(data_numeric, na.rm = TRUE)[2] - range(data_numeric, na.rm = TRUE)[1]
+    stats$var <- var(data_numeric, na.rm = TRUE)
+    stats$sd <- sd(data_numeric, na.rm = TRUE)
+    stats$cv <- (stats$sd / stats$media) * 100 # Coeficiente de Variación
+
+    message("Rango: ", round(stats$rango, 4))
+    message("Varianza: ", round(stats$var, 4))
+    message("Desviación Estándar: ", round(stats$sd, 4))
+    message("Coeficiente de Variación (%): ", round(stats$cv, 4))
+
+
+    # Medidas de forma (Requiere librería e1071)
+    if (!requireNamespace("e1071", quietly = TRUE)) {
+       message("Instalando paquete 'e1071' para Asimetría y Curtosis...")
+       install.packages("e1071", dependencies = TRUE)
+       library(e1071)
+    } else {
+       library(e1071)
+    }
+
+    stats$asimetria <- skewness(data_numeric, na.rm = TRUE)
+    stats$curtosis <- kurtosis(data_numeric, na.rm = TRUE)
+
+    message("Asimetría (Skewness): ", round(stats$asimetria, 4))
+    message("Curtosis (Exceso de Kurtosis): ", round(stats$curtosis, 4))
+
+     # Identificar posibles outliers cuantitativamente (IQR method)
+    message("\n--- Identificación Cuantitativa de Outliers (Método IQR) ---")
+    Q1 <- quantile(data_numeric, 0.25, na.rm = TRUE)
+    Q3 <- quantile(data_numeric, 0.75, na.rm = TRUE)
+    IQR_val <- Q3 - Q1
+    lower_bound <- Q1 - 1.5 * IQR_val
+    upper_bound <- Q3 + 1.5 * IQR_val
+
+    outliers <- data_numeric[data_numeric < lower_bound | data_numeric > upper_bound]
+
+    message("Q1 (Percentil 25): ", round(Q1, 2))
+    message("Q3 (Percentil 75): ", round(Q3, 2))
+    message("IQR (Rango Intercuartílico): ", round(IQR_val, 2))
+    message("Límite Inferior (Q1 - 1.5*IQR): ", round(lower_bound, 2))
+    message("Límite Superior (Q3 + 1.5*IQR): ", round(upper_bound, 2))
+    message("Número de posibles outliers (método IQR): ", length(outliers))
+    if(length(outliers) > 0 && length(outliers) <= 20) { # Limit printing
+      message("Posibles outliers encontrados: ", paste(sort(outliers), collapse = ", "))
+    } else if (length(outliers) > 20) {
+       message("Mostrando los primeros 20 posibles outliers: ", paste(sort(outliers)[1:20], collapse = ", "))
+    }
+
+  } else {
+      message("La columna '", var_name, "' no es numérica, no se calcularán estadígrafos numéricos.")
+  }
+
+  # Return the calculated statistics (or NULL if not numeric)
+  if (is_numeric) return(stats) else return(NULL)
+}
+
+# Ensure ggplot2 is loaded for plotting within the function
+library(ggplot2)
+library(dplyr) # for bind_rows
+
+# Ejecutar análisis para Edad y Puntajes
+estad_edad <- analizar_variable(df, "Edad")
+estad_puntajes <- analizar_variable(df, "Puntaje") # Changed "Puntajes" to "Puntaje"
+
+# Conclusión general basada en la comparación de Edad y Puntajes
+#La varianza de 355.33 indica una alta dispersión de los datos, lo que refleja que los puntajes son muy variados y poco concentrados alrededor de la media.
+message("\n--- Conclusión General ---")
+conclusion <- function(var_name, stats) {
+  if (is.null(stats)) {
+      return(paste0("No se pudieron calcular estadísticas para '", var_name, "'."))
+  }
+  conclusion_text <- paste0("Para la variable '", var_name, "', la media (", round(stats$media, 2),
+                            ") y la mediana (", stats$mediana,
+                            ") están ",
+                            ifelse(abs(stats$media - stats$mediana) < stats$sd * 0.25,
+                                   "cercanas, lo que sugiere una distribución aproximadamente simétrica.",
+                                   "alejadas, lo que podría indicar una distribución sesgada."))
+  return(conclusion_text)
+}
+
+message(conclusion("Edad", estad_edad))
+message(conclusion("Puntaje", estad_puntajes)) # Changed "Puntajes" to "Puntaje"
+```
+
+5\) calcular las medidas de forma (asimetrıa y curtosis)
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+analizar_variable <- function(df, var_name) {
+  if (!var_name %in% names(df)) {
+    message("Error: La columna '", var_name, "' no existe.")
+    return(NULL)
+  }
+
+  data_clean <- na.omit(df[[var_name]])
+  if (length(data_clean) == 0) {
+    message("Advertencia: '", var_name, "' no tiene datos válidos.")
+    return(NULL)
+  }
+
+  is_numeric <- is.numeric(data_clean)
+  is_discrete <- is_numeric && all(data_clean == floor(data_clean)) &&
+                 length(unique(data_clean)) / length(data_clean) < 0.1
+
+  message("\n--- Análisis Descriptivo para '", var_name, "' ---")
+
+  # Gráficos
+  message("\n--- Gráficos ---")
+  if (is_numeric) {
+    binwidth <- diff(range(data_clean)) / 30
+    print(ggplot(data.frame(x = data_clean), aes(x)) +
+            geom_histogram(binwidth = binwidth, fill = "skyblue", color = "black") +
+            labs(title = paste("Histograma de", var_name)) +
+            theme_minimal())
+    print(ggplot(data.frame(x = data_clean), aes(x)) +
+            geom_density(fill = "purple", alpha = 0.5) +
+            labs(title = paste("Densidad de", var_name)) +
+            theme_minimal())
+    print(ggplot(data.frame(x = data_clean), aes(y = x)) +
+            geom_boxplot(fill = "lightgreen") +
+            labs(title = paste("Boxplot de", var_name)) +
+            theme_minimal())
+  } else {
+    print(ggplot(data.frame(x = as.factor(data_clean)), aes(x)) +
+            geom_bar(fill = "salmon", color = "black") +
+            labs(title = paste("Distribución de", var_name)) +
+            theme_minimal())
+  }
+
+  # Tabla de frecuencia
+  message("\n--- Frecuencias ---")
+  if (length(unique(data_clean)) <= 50) {
+    tabla <- table(data_clean)
+    print(cbind(Frecuencia = tabla, Relativa = prop.table(tabla)))
+  } else {
+    print(summary(data_clean))
+  }
+
+  if (!is_numeric) return(NULL)
+
+  # Estadísticos
+  message("\n--- Estadígrafos ---")
+  media <- mean(data_clean)
+  mediana <- median(data_clean)
+  moda <- as.numeric(names(which.max(table(data_clean))))
+  sd_val <- sd(data_clean)
+  cv <- sd_val / media * 100
+  rango <- diff(range(data_clean))
+  varianza <- var(data_clean)
+
+  # Asimetría y curtosis
+  if (!requireNamespace("e1071", quietly = TRUE)) install.packages("e1071")
+  library(e1071)
+  asim <- skewness(data_clean)
+  kurt <- kurtosis(data_clean)
+
+  # Outliers
+  Q1 <- quantile(data_clean, 0.25)
+  Q3 <- quantile(data_clean, 0.75)
+  IQR_val <- Q3 - Q1
+  outliers <- data_clean[data_clean < (Q1 - 1.5 * IQR_val) | data_clean > (Q3 + 1.5 * IQR_val)]
+
+  # Interpretación textual
+  message("\n--- Interpretación ---")
+  interp <- c()
+
+  # Simetría
+  dif_media_mediana <- abs(media - mediana)
+  interp <- c(interp, if (dif_media_mediana < 0.25 * sd_val) {
+    "La media y la mediana son similares, lo que sugiere una distribución simétrica."
+  } else {
+    "La diferencia entre la media y la mediana sugiere una distribución sesgada."
+  })
+
+  # Dispersión
+  interp <- c(interp, paste0("La desviación estándar es de ", round(sd_val, 2), 
+                              ", indicando una ", 
+                              if (cv < 20) "baja" else if (cv <= 40) "moderada" else "alta", 
+                              " dispersión relativa (CV = ", round(cv, 1), "%)."))
+
+  # Forma de la distribución
+  interp <- c(interp, paste0("Asimetría: ", round(asim, 2), 
+                             if (asim > 1) " (asimetría positiva marcada)." else if (asim < -1) " (asimetría negativa marcada)." else " (asimetría leve o moderada)."))
+  interp <- c(interp, paste0("Curtosis: ", round(kurt, 2), 
+                             if (kurt > 3) " (distribución más apuntada que una normal)." else if (kurt < 3) " (distribución más achatada que una normal)." else " (similar a la normal)."))
+
+  # Outliers
+  interp <- c(interp, paste0("Se identificaron ", length(outliers), 
+                             " posibles valores atípicos mediante el método IQR."))
+
+  # Mostrar interpretación
+  cat(paste("-", interp, collapse = "\n"))
+
+  return(list(
+    media = media, mediana = mediana, moda = moda, sd = sd_val,
+    cv = cv, rango = rango, varianza = varianza,
+    asimetria = asim, curtosis = kurt, outliers = outliers,
+    interpretacion = interp
+  ))
+}
+
+# Ejemplo de uso
+estad_edad <- analizar_variable(df, "Edad")
+estad_puntaje <- analizar_variable(df, "Puntaje")
+```
+
+6\) identificar posibles outliers mediante analisis grafico y cuantitativo.
+
+```{r}
+# prompt: 6) identificar posibles outliers mediante analisis grafico para todas las columnas
+
+# Identificar posibles outliers mediante análisis gráfico para todas las columnas cuantitativas
+
+# Seleccionar solo las columnas cuantitativas del dataframe
+cuantitativas_df <- df[sapply(df, is.numeric)]
+
+# Graficar Boxplots para cada columna cuantitativa
+# Un boxplot es una excelente herramienta gráfica para visualizar la distribución y detectar posibles outliers.
+# Los puntos que se extienden más allá de los "bigotes" del boxplot son considerados posibles outliers.
+
+message("\n--- Análisis Gráfico de Outliers (Boxplots) ---")
+
+# Iterar sobre cada columna cuantitativa y generar un boxplot
+for (col_name in names(cuantitativas_df)) {
+  # Eliminar valores NA para el gráfico
+  col_data <- cuantitativas_df[[col_name]][!is.na(cuantitativas_df[[col_name]])]
+
+  # *** FIX: Add a check to ensure col_data is not empty before plotting ***
+  if (length(col_data) > 0 && length(unique(col_data)) > 1) { # Asegurarse de que la columna tenga variabilidad y no esté vacía
+    p <- ggplot(data.frame(y = col_data), aes(y = y)) +
+      geom_boxplot(fill = "orange", color = "black") +
+      labs(title = paste("Boxplot de", col_name, "(Posibles Outliers)"),
+           y = col_name) +
+      theme_minimal() +
+      theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+    print(p)
+  } else if (length(col_data) == 0) {
+    message("La columna '", col_name, "' está vacía después de eliminar NAs, no se puede graficar un boxplot.")
+  }
+  else {
+    message("La columna '", col_name, "' tiene solo un valor único o es constante, no se puede graficar un boxplot.")
+  }
+}
+
+message("\n--- Interpretación de los Boxplots ---")
+message("En los boxplots mostrados, los puntos individuales que aparecen fuera de los 'bigotes' representan posibles outliers.")
+message("Estos puntos están significativamente alejados de la mayoría de los datos en esa columna.")
+message("Se recomienda investigar estos puntos para determinar si son errores de medición/entrada de datos o valores extremos genuinos.")
+message("La decisión de eliminar, transformar o mantener estos outliers dependerá del contexto del análisis y del dominio de los datos.")
+```
+
+## 2.-De los datos Estudiantes.xlsx de la pregunta
+
+a\) \[1 pto\] Seleccionar una muestra de n = 150 observaciones para la variable Ingreso (en millones de pesos). Suponiendo que esta variable tiene una distribucion normal, cual es la probabilidad de que el ingreso sea a lo mas de \$1.500.000 ?
+
+```{r}
+library(ggplot2)
+
+# --- Configuración inicial ---
+columna_objetivo <- "Ingreso"
+
+# Diagnóstico básico del dataframe
+message("\n--- Diagnóstico del DataFrame ---")
+if (!columna_objetivo %in% names(df)) stop(paste("La columna", columna_objetivo, "no existe."))
+print(str(df[[columna_objetivo]]))
+
+# --- Limpieza y muestreo ---
+ingresos <- as.numeric(df[[columna_objetivo]])
+ingresos <- ingresos[!is.na(ingresos)]
+
+if (length(ingresos) == 0) stop("No hay datos numéricos válidos.")
+
+set.seed(123)
+muestra <- if (length(ingresos) < 150) ingresos else sample(ingresos, 150)
+
+# --- Estadísticas y probabilidad ---
+media <- mean(muestra)
+desv <- sd(muestra)
+prob <- pnorm(1.5, mean = media, sd = desv)
+
+message("\n--- Resultados ---")
+message(sprintf("Media de la muestra: %.4f", media))
+message(sprintf("Desviación estándar: %.4f", desv))
+message(sprintf("Probabilidad de que el ingreso sea ≤ 1.5: %.4f", prob))
+
+# --- Gráficos ---
+df_muestra <- data.frame(Ingreso = muestra)
+
+# Histograma
+ggplot(df_muestra, aes(x = Ingreso)) +
+  geom_histogram(binwidth = (max(muestra) - min(muestra)) / 20,
+                 fill = "coral", color = "black", alpha = 0.7) +
+  labs(title = "Distribución de la Muestra",
+       x = "Ingreso", y = "Frecuencia") +
+  theme_minimal()
+
+# Densidad
+ggplot(df_muestra, aes(x = Ingreso)) +
+  geom_density(fill = "forestgreen", alpha = 0.6) +
+  labs(title = "Curva de Densidad", x = "Ingreso", y = "Densidad") +
+  theme_minimal()
+
+# QQ Plot
+ggplot(df_muestra, aes(sample = Ingreso)) +
+  stat_qq() + stat_qq_line() +
+  labs(title = "QQ Plot: Evaluación de Normalidad",
+       x = "Cuantiles Teóricos", y = "Cuantiles Muestrales") +
+  theme_minimal()
+
+# --- Interpretación ---
+message("\n--- Interpretación ---")
+message(sprintf("Bajo el supuesto de normalidad, hay aproximadamente un %.2f%% de probabilidad de que el ingreso sea como máximo 1.5.", prob * 100))
+message("Los gráficos permiten evaluar visualmente la forma y normalidad de la muestra seleccionada.")
+
+```
+
+b\) \[0.5 pts\] De la misma muestra obtenida en b), Cual es la probabilidad de que el ingreso sea de m´as de \$1.000.000?
+
+```{r}
+library(ggplot2)
+
+# --- Parámetros ---
+columna_objetivo <- "Ingreso"
+umbral <- 1
+
+# --- Verificar y generar la muestra si no existe ---
+if (!exists("muestra_ingreso") || length(muestra_ingreso) == 0) {
+  if (!columna_objetivo %in% names(df)) stop("La columna 'Ingreso' no existe en el dataframe.")
+  
+  ingresos <- as.numeric(df[[columna_objetivo]])
+  ingresos <- ingresos[!is.na(ingresos)]
+  
+  if (length(ingresos) == 0) stop("No hay datos numéricos válidos en la columna 'Ingreso'.")
+  
+  set.seed(123)
+  muestra_ingreso <- if (length(ingresos) < 150) ingresos else sample(ingresos, 150)
+}
+
+# --- Cálculo de parámetros y probabilidad ---
+media <- mean(muestra_ingreso)
+desv <- sd(muestra_ingreso)
+probabilidad <- pnorm(umbral, mean = media, sd = desv)
+
+message("\n--- Estadísticas de la muestra ---")
+message(sprintf("Media: %.4f", media))
+message(sprintf("Desviación estándar: %.4f", desv))
+message(sprintf("Probabilidad de que el ingreso sea ≤ %.1f: %.4f", umbral, probabilidad))
+
+# --- Interpretación ---
+interpretacion <- if (probabilidad > 0.5) {
+  "Es bastante probable que un ingreso aleatorio sea menor o igual a 1."
+} else if (probabilidad > 0.2) {
+  "Existe una posibilidad moderada de que el ingreso sea menor o igual a 1."
+} else {
+  "Es poco probable que un ingreso aleatorio sea menor o igual a 1."
+}
+message("\n--- Interpretación ---")
+message(interpretacion)
+
+# --- Gráfico de la distribución y el área bajo la curva ---
+x_vals <- seq(min(muestra_ingreso) - 2*desv, max(muestra_ingreso) + 2*desv, length.out = 500)
+y_vals <- dnorm(x_vals, mean = media, sd = desv)
+df_plot <- data.frame(x = x_vals, y = y_vals)
+
+ggplot(df_plot, aes(x, y)) +
+  geom_line(color = "blue") +
+  geom_area(data = subset(df_plot, x <= umbral), fill = "skyblue", alpha = 0.5) +
+  geom_vline(xintercept = umbral, linetype = "dashed", color = "red", size = 1) +
+  annotate("text", x = umbral, y = 0, 
+           label = paste0("P(X ≤ ", umbral, ") = ", round(probabilidad, 4)),
+           hjust = -0.1, vjust = -1, color = "darkgreen", size = 4) +
+  labs(title = paste("Distribución Normal de Ingreso con P(X ≤", umbral, ")"),
+       x = "Ingreso", y = "Densidad") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+```
+
+c\) \[0.5 pto\] Realice un muestreo estratificado utilizando la variable Estrato, considerando un tama˜no de muestra por clase de n = 50 observaciones. Entregue la media y varianza por clase; y comp´arelos con los de la muestra completa (Pregunta 1).
+
+```{r}
+
+# Tomar 50 observaciones de la columna 'Estrato'
+# Asegúrate de que la columna 'Estrato' exista en tu dataframe 'df'
+# Y que sea una variable adecuada para este análisis (cualitativa o cuantitativa discreta).
+if ("Estrato" %in% names(df)) {
+
+  # Eliminar valores NA de la columna Estrato antes de tomar la muestra
+  estrato_data_full <- df$Estrato[!is.na(df$Estrato)]
+
+  # Verificar si hay suficientes datos para la muestra de 50
+  if (length(estrato_data_full) >= 50) {
+    set.seed(456) # Para que la muestra sea reproducible
+    sample_estrato <- sample(estrato_data_full, size = 50, replace = FALSE)
+
+    message("\n--- Muestra de 50 observaciones de Estrato ---")
+    print(head(sample_estrato)) # Mostrar las primeras observaciones de la muestra
+
+    # Convertir la muestra y la columna completa a factor si aún no lo son
+    # Esto es útil si Estrato es una variable categórica o cualitativa
+    sample_estrato_factor <- as.factor(sample_estrato)
+    estrato_data_full_factor <- as.factor(estrato_data_full)
+
+    # Calcular la media y varianza por clase en la muestra
+    # Si Estrato es cuantitativa, calculamos media y varianza
+    # Si Estrato es cualitativa, estas medidas no son apropiadas.
+    # Asumiremos que Estrato es cuantitativa o discreta para este cálculo.
+    if (is.numeric(df$Estrato)) {
+        sample_estrato_numeric <- as.numeric(sample_estrato)
+
+        # Calcular media y varianza de la muestra completa de Estrato
+        mean_sample_estrato <- mean(sample_estrato_numeric)
+        var_sample_estrato <- var(sample_estrato_numeric)
+
+        message("\n--- Estadísticas de la Muestra de Estrato (50 observaciones) ---")
+        message("Media de la muestra: ", round(mean_sample_estrato, 2))
+        message("Varianza de la muestra: ", round(var_sample_estrato, 2))
+
+        # Calcular la media y varianza de la columna Estrato completa en el dataframe original
+        estrato_data_full_numeric <- as.numeric(estrato_data_full)
+        mean_full_estrato <- mean(estrato_data_full_numeric)
+        var_full_estrato <- var(estrato_data_full_numeric)
+
+        message("\n--- Estadísticas de la Columna Estrato Completa ---")
+        message("Media de la columna completa: ", round(mean_full_estrato, 2))
+        message("Varianza de la columna completa: ", round(var_full_estrato, 2))
+
+        # Comparación
+        message("\n--- Comparación de Estadísticas ---")
+        message("Diferencia en Medias (Muestra - Completa): ", round(mean_sample_estrato - mean_full_estrato, 2))
+        message("Diferencia en Varianzas (Muestra - Completa): ", round(var_sample_estrato - var_full_estrato, 2))
+        message("Las estadísticas de la muestra (50 obs) se comparan con las de la población (columna completa).")
+        message("Se espera que las estadísticas de la muestra sean similares a las de la población, pero con alguna variabilidad debido al muestreo.")
+
+
+        # Graficar la distribución de la muestra vs la distribución completa
+        # Crear dataframes para graficar
+        plot_df_sample <- data.frame(Estrato = sample_estrato_numeric, Tipo = "Muestra (50)")
+        plot_df_full <- data.frame(Estrato = estrato_data_full_numeric, Tipo = "Columna Completa")
+
+        # Combinar los dataframes para facilitar la graficación conjunta
+        plot_df_combined <- bind_rows(plot_df_sample, plot_df_full)
+
+        # Histograma comparativo
+        p_hist_estrato <- ggplot(plot_df_combined, aes(x = Estrato, fill = Tipo)) +
+          geom_histogram(aes(y = after_stat(density)), position = "identity", alpha = 0.6, binwidth = 1) +
+          geom_density(aes(y = after_stat(density), color = Tipo), alpha = 0.7) +
+          labs(title = "Distribución Comparativa de Estrato",
+               x = "Estrato", y = "Densidad") +
+          scale_fill_brewer(palette = "Pastel1") +
+          scale_color_brewer(palette = "Dark2") +
+          theme_minimal() +
+          theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+        print(p_hist_estrato)
+
+        # Boxplot comparativo
+         p_box_estrato <- ggplot(plot_df_combined, aes(x = Tipo, y = Estrato, fill = Tipo)) +
+           geom_boxplot(alpha = 0.7) +
+           geom_jitter(width = 0.15, alpha = 0.3, color = "darkblue") +
+           labs(title = "Boxplot Comparativo de Estrato",
+                x = "", y = "Estrato") +
+           scale_fill_brewer(palette = "Pastel1") +
+           theme_minimal() +
+           theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+                 axis.text.x = element_text(angle = 0, hjust = 0.5))
+
+         print(p_box_estrato)
+
+
+    } else if (is.factor(sample_estrato_factor) || is.character(sample_estrato)) {
+        # Si Estrato es cualitativa, calculamos tablas de frecuencia
+        message("\n--- Tablas de Frecuencia de la Muestra de Estrato (50 observaciones) ---")
+        print(prop.table(table(sample_estrato_factor)))
+
+        message("\n--- Tablas de Frecuencia de la Columna Estrato Completa ---")
+        print(prop.table(table(estrato_data_full_factor)))
+
+        # Comparación visual con gráficos de barras
+         plot_df_sample <- data.frame(Estrato = sample_estrato_factor, Tipo = "Muestra (50)")
+         plot_df_full <- data.frame(Estrato = estrato_data_full_factor, Tipo = "Columna Completa")
+         plot_df_combined <- bind_rows(plot_df_sample, plot_df_full)
+
+         p_bar_estrato <- ggplot(plot_df_combined, aes(x = Estrato, fill = Tipo)) +
+           geom_bar(position = "dodge", color = "black") +
+           labs(title = "Distribución Comparativa de Estrato",
+                x = "Estrato", y = "Frecuencia") +
+           scale_fill_brewer(palette = "Pastel1") +
+           theme_minimal() +
+           theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+         print(p_bar_estrato)
+
+    } else {
+         message("La columna 'Estrato' no es numérica ni cualitativa reconocida para este análisis.")
+    }
+
+  } else {
+    message("No hay suficientes observaciones no nulas en la columna 'Estrato' para seleccionar una muestra de 50.")
+  }
+
+} else {
+  message("La columna 'Estrato' no existe en el dataframe.")
+}
+```
+
+## 3.-Resuelva los siguientes problemas:
+
+a\) \[0.5 ptos\] Dos estrategias de marketing A y B finalizan en una venta en 65% y 50% de los casos, respectivamente. Suponiendo que ambas estrategias act´uan de forma independiente y que se aplican a la vez a los individuos de un centro comercial, calcule la probabilidad de que un individuo realice una compra como producto de alguna de estas estrategias
+
+```{r}
+
+# Define las probabilidades de éxito para cada estrategia
+P_A <- 0.65
+P_B <- 0.50
+
+# Como las estrategias son independientes, la probabilidad de que falle la estrategia A es (1 - P_A)
+P_no_A <- 1 - P_A
+
+# Y la probabilidad de que falle la estrategia B es (1 - P_B)
+P_no_B <- 1 - P_B
+
+# La probabilidad de que AMBAS estrategias fallen (ninguna resulte en venta) es,
+# por independencia, el producto de sus probabilidades individuales de falla:
+P_no_A_and_no_B <- P_no_A * P_no_B
+
+# La probabilidad de que un individuo realice una compra como producto de ALGUNA
+# de estas estrategias es el evento complementario a que ninguna estrategia resulte en venta.
+# P(A or B) = 1 - P(no A and no B)
+P_A_or_B <- 1 - P_no_A_and_no_B
+
+# Imprime el resultado
+message("La probabilidad de que un individuo realice una compra como producto de alguna de estas estrategias es: ", round(P_A_or_B, 4))
+
+# --- Graficar el problema ---
+# Aunque no hay datos de dataframe para graficar directamente este problema de probabilidad
+# podemos crear un gráfico que represente las probabilidades.
+# Podemos usar un diagrama de Venn conceptual o simplemente barras que muestren las probabilidades.
+
+# Vamos a crear un gráfico de barras simple para visualizar las probabilidades
+library(ggplot2)
+
+# Crear un dataframe con las probabilidades clave
+prob_data <- data.frame(
+  Estrategia = c("Estrategia A", "Estrategia B", "Ambas Fallan", "Al Menos Una Compra"),
+  Probabilidad = c(P_A, P_B, P_no_A_and_no_B, P_A_or_B)
+)
+
+# Reordenar para una mejor visualización (opcional)
+prob_data$Estrategia <- factor(prob_data$Estrategia,
+                               levels = c("Estrategia A", "Estrategia B", "Ambas Fallan", "Al Menos Una Compra"))
+
+
+# Crear el gráfico de barras
+ggplot(prob_data, aes(x = Estrategia, y = Probabilidad, fill = Estrategia)) +
+  geom_bar(stat = "identity", color = "black") +
+  geom_text(aes(label = scales::percent(Probabilidad, accuracy = 0.1)),
+            vjust = -0.5, color = "black") + # Añadir etiquetas con porcentaje
+  scale_y_continuous(limits = c(0, 1), labels = scales::percent) + # Formato de porcentaje en eje Y
+  labs(title = "Probabilidades de Éxito de Estrategias de Marketing",
+       x = "Evento",
+       y = "Probabilidad") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        axis.text.x = element_text(angle = 0, hjust = 0.5)) +
+  scale_fill_brewer(palette = "Paired") # Cambiar la paleta de colores
+# Imprime el resultado
+message("La probabilidad de que un individuo realice una compra como producto de alguna de estas estrategias es: ", round(P_A_or_B, 4))
+
+# Nota: Este gráfico es una visualización de los resultados del cálculo, no un gráfico de datos reales.
+```
+
+b\) \[1 pto\] Una empresa esta´estudiando la posibilidad de construir una granja en cierto sector agropecuario. La compa˜n´ıa considera de gran importancia la construcci´on de un reservorio en las cercan´ıas del lugar. Si el gobierno aprueba este reservorio, la probabilidad de que la compa˜n´ıa construya la granja es de 90%, de otra manera es de 2%. El presidente de la compa˜nia estima que hay un 60% de posibilidades de que el reservorio sea aprobado. Hallar primero la probabilidad de que la compa˜n´ıa construya la granja. Luego, si la granja ya fue construida, hallar la probabilidad de que el reservorio haya sido aprobado.
+
+```{r}
+
+# Definir las probabilidades dadas
+P_R_aprobado <- 0.60 # Probabilidad de que el reservorio sea aprobado (R)
+P_G_dado_R <- 0.90   # Probabilidad de que se construya la granja (G) dado R
+P_G_dado_no_R <- 0.02 # Probabilidad de que se construya la granja (G) dado que R no fue aprobado (no R)
+
+# Calcular la probabilidad de que el reservorio NO sea aprobado (no R)
+P_no_R_aprobado <- 1 - P_R_aprobado
+
+# Calcular la probabilidad de que la compañia construya la granja (P(G))
+# Usamos el Teorema de Probabilidad Total:
+# P(G) = P(G | R) * P(R) + P(G | no R) * P(no R)
+P_G <- (P_G_dado_R * P_R_aprobado) + (P_G_dado_no_R * P_no_R_aprobado)
+
+message("La probabilidad de que la compañía construya la granja es (P(G)): ", round(P_G, 4))
+
+# Calcular la probabilidad de que el reservorio haya sido aprobado dado que la granja ya fue construida (P(R | G))
+# Usamos el Teorema de Bayes:
+# P(R | G) = [P(G | R) * P(R)] / P(G)
+P_R_dado_G <- (P_G_dado_R * P_R_aprobado) / P_G
+
+message("La probabilidad de que el reservorio haya sido aprobado dado que la granja fue construida es (P(R | G)): ", round(P_R_dado_G, 4))
+
+# --- Graficar ---
+# Podemos usar un diagrama de árbol o un gráfico de barras para visualizar las probabilidades.
+# Un diagrama de barras mostrando las probabilidades clave puede ser útil.
+
+# Crear un dataframe con las probabilidades calculadas para graficar
+prob_data_granja <- data.frame(
+  Evento = c("P(Reservorio Aprobado)",
+             "P(Reservorio NO Aprobado)",
+             "P(Granja | R Aprobado)",
+             "P(Granja | R NO Aprobado)",
+             "P(Granja)",
+             "P(Reservorio Aprobado | Granja)"),
+  Probabilidad = c(P_R_aprobado,
+                   P_no_R_aprobado,
+                   P_G_dado_R,
+                   P_G_dado_no_R,
+                   P_G,
+                   P_R_dado_G)
+)
+
+# Reordenar los eventos para el gráfico
+prob_data_granja$Evento <- factor(prob_data_granja$Evento,
+                                  levels = c("P(Reservorio Aprobado)",
+                                             "P(Reservorio NO Aprobado)",
+                                             "P(Granja | R Aprobado)",
+                                             "P(Granja | R NO Aprobado)",
+                                             "P(Granja)",
+                                             "P(Reservorio Aprobado | Granja)"))
+
+# Crear el gráfico de barras
+library(ggplot2)
+library(scales) # Para formatear etiquetas como porcentaje
+
+ggplot(prob_data_granja, aes(x = Evento, y = Probabilidad, fill = Evento)) +
+  geom_bar(stat = "identity", color = "black") +
+  geom_text(aes(label = percent(Probabilidad, accuracy = 0.1)),
+            vjust = -0.5, color = "black", size = 3.5) + # Añadir etiquetas de porcentaje
+  scale_y_continuous(limits = c(0, 1.1), labels = percent) + # Formato de porcentaje en eje Y
+  labs(title = "Probabilidades relacionadas con la Construcción de la Granja",
+       x = "Evento",
+       y = "Probabilidad") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        axis.text.x = element_text(angle = 45, hjust = 1)) + # Rotar etiquetas del eje x
+  scale_fill_brewer(palette = "Set3") + # Cambiar la paleta de colores
+  guides(fill = "none") # Ocultar la leyenda si los nombres son autoexplicativos
+```
+
+c\) \[0.5 pts\] Un taller sabe que en promedio por la ma˜nana acuden tres autom´oviles con problemas el´ectricos, ocho con problemas mec´anicos y tres con problemas de chapa, y por la tarde dos con problemas el´ectricos, tres con problemas mec´anicos y uno con problema de la chapa. Realice una tabla ordenando la informaci´on para luego calcular la probabilidad de que un autom´ovil acuda por problemas de chapa, si se sabe que asiste por la tarde
+
+```{r}
+# Crear la tabla con la información proporcionada
+datos_taller <- data.frame(
+  Momento_del_Dia = c("Mañana", "Tarde", "Total"),
+  Electricos = c(3, 2, 3+2),
+  Mecanicos = c(8, 3, 8+3),
+  Chapa = c(3, 1, 3+1),
+  Total = c(3+8+3, 2+3+1, (3+8+3) + (2+3+1))
+)
+
+# Mostrar la tabla
+message("Tabla de Automóviles por Tipo de Problema y Momento del Día:")
+print(datos_taller)
+
+# Calcular la probabilidad solicitada: P(Chapa | Tarde)
+# P(Chapa | Tarde) = P(Chapa y Tarde) / P(Tarde)
+# P(Chapa y Tarde) = Número de automóviles con problemas de chapa por la tarde = 1
+# P(Tarde) = Número total de automóviles por la tarde = 6
+
+prob_chapa_dado_tarde <- datos_taller$Chapa[datos_taller$Momento_del_Dia == "Tarde"] / datos_taller$Total[datos_taller$Momento_del_Dia == "Tarde"]
+
+message("\nProbabilidad de que un automóvil acuda por problemas de chapa, si se sabe que asiste por la tarde:")
+message("P(Chapa | Tarde) = ", round(prob_chapa_dado_tarde, 4))
+
+# Graficar la distribución de problemas por momento del día
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+# Preparar los datos para graficar (excluir fila Total para el gráfico de conteos)
+datos_para_grafico <- datos_taller %>%
+  filter(Momento_del_Dia != "Total") %>%
+  select(-Total) %>% # Eliminar la columna Total antes de pivotar
+  pivot_longer(cols = -Momento_del_Dia, names_to = "Tipo_Problema", values_to = "Frecuencia") %>%
+  mutate(Tipo_Problema = factor(Tipo_Problema, levels = c("Electricos", "Mecanicos", "Chapa"))) # Ordenar para el gráfico
+
+# Crear el gráfico de barras apiladas
+ggplot(datos_para_grafico, aes(x = Momento_del_Dia, y = Frecuencia, fill = Tipo_Problema)) +
+  geom_bar(stat = "identity", position = "stack", color = "black") +
+  geom_text(aes(label = Frecuencia), position = position_stack(vjust = 0.5), color = "white", size = 4) + # Añadir etiquetas
+  labs(title = "Distribución de Automóviles por Tipo de Problema y Momento del Día",
+       x = "Momento del Día",
+       y = "Frecuencia",
+       fill = "Tipo de Problema") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  scale_fill_brewer(palette = "Set2") # Paleta de colores
+
+# Opcional: Gráfico de barras mostrando la probabilidad condicional
+# Podemos crear un gráfico que resalte la proporción de problemas de Chapa por la tarde
+datos_prob_tarde <- datos_para_grafico %>%
+  filter(Momento_del_Dia == "Tarde") %>%
+  mutate(Proporcion = Frecuencia / sum(Frecuencia))
+
+ggplot(datos_prob_tarde, aes(x = Tipo_Problema, y = Proporcion, fill = Tipo_Problema)) +
+  geom_bar(stat = "identity", color = "black") +
+  geom_text(aes(label = scales::percent(Proporcion, accuracy = 0.1)), vjust = -0.5, size = 4) +
+  labs(title = "Proporción de Tipos de Problemas en la Tarde",
+       x = "Tipo de Problema",
+       y = "Proporción",
+       fill = "Tipo de Problema") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_brewer(palette = "Set2")
+```
+
+## 4.-Resuelva los siguientes problemas:
+
+a\) \[1 pto\] La polic´ıa de la comuna de Lo Espejo encuest´o el mes pasado a un grupo de due˜nas de casa, pregunt´andole si han sido v´ıctimas de alguna estafa telef´onica alguna vez. En la encuesta, un 15% ha sido v´ıctima de una estafa telef´onica. Suponga que la variable aleatoria de estudio corresponde al n´umero de due˜nas de casa que han sido estafadas en su hogar. Si se encuestan a 14 due˜nas de casa, cu´al es la probabilidad de que a lo menos 2 due˜nas de casa hayan sido v´ıctimas de estafa telef´onica en su hogar? y, cu´al es el valor esperado de due˜nas de casa que hayan sido v´ıctimas de estafa telef´onica en su hogar?
+
+```{r}
+# Probabilidad de que una dueña de casa haya sido víctima de estafa (p)
+p <- 0.15
+
+# Número de dueñas de casa encuestadas (n)
+n <- 14
+
+# La variable aleatoria de estudio (X) sigue una distribución binomial: X ~ B(n=14, p=0.15)
+
+# 1. Probabilidad de que a lo menos 2 dueñas de casa hayan sido víctimas de estafa
+# Esto es P(X >= 2) = 1 - P(X < 2) = 1 - [P(X = 0) + P(X = 1)]
+prob_menos_de_2 <- pbinom(q = 1, size = n, prob = p)
+prob_al_menos_2 <- 1 - prob_menos_de_2
+
+message("La probabilidad de que a lo menos 2 dueñas de casa hayan sido víctimas de estafa es P(X >= 2): ",
+        round(prob_al_menos_2, 4))
+
+# 2. Valor esperado (Media) de dueñas de casa que hayan sido víctimas de estafa
+# Para una distribución binomial B(n, p), el valor esperado es E(X) = n * p
+valor_esperado <- n * p
+
+message("El valor esperado de dueñas de casa que hayan sido víctimas de estafa es E(X): ",
+        round(valor_esperado, 2))
+
+# 3. Graficar la distribución binomial
+# Creamos un rango de valores posibles para X (de 0 a n)
+x_valores <- 0:n
+
+# Calculamos la probabilidad para cada valor de X usando dbinom()
+probabilidades <- dbinom(x_valores, size = n, prob = p)
+
+# Creamos un dataframe para el gráfico
+datos_grafico <- data.frame(
+  Numero_Estafadas = x_valores,
+  Probabilidad = probabilidades
+)
+
+# Cargar librería para visualización
+library(ggplot2)
+
+# Gráfico de barras de la distribución de probabilidad
+ggplot(datos_grafico, aes(x = factor(Numero_Estafadas), y = Probabilidad)) +
+  geom_bar(stat = "identity", fill = "skyblue", color = "black") +
+  labs(
+    title = paste0("Distribución de Probabilidad Binomial B(n=", n, ", p=", p, ")"),
+    x = "Número de Dueñas de Casa Estafadas (X)",
+    y = "Probabilidad"
+  ) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+
+  # Marcar el valor esperado con línea discontinua roja
+  geom_vline(xintercept = valor_esperado + 1, color = "red", linetype = "dashed", size = 1) +
+  annotate("text", x = valor_esperado + 1.2, y = max(probabilidades),
+           label = paste("E(X) =", round(valor_esperado, 2)),
+           vjust = -0.5, color = "red", size = 4) +
+
+  # Sombrear el área de P(X >= 2)
+  geom_area(
+    data = subset(datos_grafico, Numero_Estafadas >= 2),
+    aes(x = Numero_Estafadas, y = Probabilidad, group = 1),
+    fill = "orange", alpha = 0.5
+  ) +
+  annotate("text", x = 5, y = max(probabilidades[x_valores >= 2]),
+           label = paste("P(X >= 2) =", round(prob_al_menos_2, 4)),
+           vjust = -0.5, color = "darkgreen", size = 4)
+
+# ----------------------------
+# Función para interpretar los resultados
+# ----------------------------
+interpretar_resultados <- function(prob_al_menos_2, valor_esperado) {
+  cat("\n--- Interpretación de Resultados ---\n")
+  
+  # Interpretación de la probabilidad
+  cat("1. Probabilidad de que al menos 2 dueñas de casa hayan sido estafadas:\n")
+  cat(sprintf("   Hay aproximadamente un %.2f%% de probabilidad de que en una muestra de 14 dueñas de casa, al menos 2 hayan sido víctimas de estafa.\n\n", prob_al_menos_2 * 100))
+  
+  # Interpretación del valor esperado
+  cat("2. Valor esperado (media):\n")
+  cat(sprintf("   En promedio, se espera que %.2f de cada 14 dueñas de casa hayan sido víctimas de estafa. Este valor representa el promedio teórico si se repitiera el experimento muchas veces.\n", valor_esperado))
+}
+
+# Llamar a la función de interpretación
+interpretar_resultados(prob_al_menos_2, valor_esperado)
+
+```
+
+b\) \[0.5 ptos\] Supongamos que los clientes llegan a una cola de espera en la caja de un supermercado a una tasa de 4 por minuto. Suponiendo que este proceso de llegada ocurre de acuerdo a un proceso de Poisson. Determinar la probabilidad que al menos una persona llegue a la cola en un intervalo de 2 minutos.
+
+```{r}
+# Tasa de llegada de clientes (lambda) en clientes por minuto
+lambda <- 4
+
+# Intervalo de tiempo (t) en minutos
+t <- 2
+
+# X ~ Poisson(lambda * t)
+lambda_t <- lambda * t
+
+# P(X = 0)
+prob_cero_llegadas <- dpois(x = 0, lambda = lambda_t)
+
+# P(X >= 1)
+prob_al_menos_uno <- 1 - prob_cero_llegadas
+
+message("La tasa de llegada en el intervalo de 2 minutos (lambda*t) es: ", lambda_t)
+message("La probabilidad de que no llegue nadie en 2 minutos (P(X=0)) es: ", round(prob_cero_llegadas, 4))
+message("La probabilidad de que al menos una persona llegue en 2 minutos (P(X >= 1)) es: ", round(prob_al_menos_uno, 4))
+
+# -------------------------------
+# Función para interpretar resultados
+# -------------------------------
+interpretar_resultados_poisson <- function(lambda_t, prob_cero_llegadas, prob_al_menos_uno) {
+  cat("\n--- Interpretación de Resultados ---\n")
+  cat(sprintf("La tasa de llegada esperada en %d minutos es %.2f clientes.\n", t, lambda_t))
+  cat(sprintf("Probabilidad de que no llegue nadie: %.2f%%.\n", prob_cero_llegadas * 100))
+  cat(sprintf("Probabilidad de que llegue al menos una persona: %.2f%%.\n", prob_al_menos_uno * 100))
+  cat("Esto sugiere un sistema con alta probabilidad de actividad en ese tiempo.\n")
+}
+
+interpretar_resultados_poisson(lambda_t, prob_cero_llegadas, prob_al_menos_uno)
+
+# -------------------------------
+# Preparar datos para graficar
+# -------------------------------
+max_x <- qpois(0.999, lambda = lambda_t)
+x_valores <- 0:max_x
+probabilidades_poisson <- dpois(x_valores, lambda = lambda_t)
+
+datos_grafico_poisson <- data.frame(
+  Numero_Llegadas = x_valores,
+  Probabilidad = probabilidades_poisson
+)
+
+# Crear texto de interpretación para incluir en el gráfico
+texto_interpretacion <- paste0(
+  "λ*t = ", lambda_t, "\n",
+  "P(X = 0) = ", round(prob_cero_llegadas, 4), "\n",
+  "P(X ≥ 1) = ", round(prob_al_menos_uno, 4), "\n",
+  "Es muy probable que llegue\nal menos un cliente en 2 minutos."
+)
+
+# -------------------------------
+# Graficar con interpretación incluida
+# -------------------------------
+library(ggplot2)
+
+ggplot(datos_grafico_poisson, aes(x = factor(Numero_Llegadas), y = Probabilidad)) +
+  geom_bar(stat = "identity", fill = "salmon", color = "black") +
+  labs(
+    title = paste0("Distribución de Probabilidad Poisson (λ*t = ", lambda_t, ")"),
+    x = "Número de Clientes Llegados en 2 Minutos (X)",
+    y = "Probabilidad"
+  ) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+
+  # Sombrear barras de P(X ≥ 1)
+  geom_area(
+    data = subset(datos_grafico_poisson, Numero_Llegadas >= 1),
+    aes(x = Numero_Llegadas, y = Probabilidad, group = 1),
+    fill = "lightblue", alpha = 0.7
+  ) +
+
+  # Mostrar valores clave
+  geom_text(x = max_x / 2, y = max(probabilidades_poisson) * 0.8,
+            label = paste("P(X ≥ 1) =", round(prob_al_menos_uno, 4)),
+            color = "darkblue", size = 5) +
+  geom_text(x = 0, y = probabilidades_poisson[1],
+            label = paste("P(X = 0) =", round(prob_cero_llegadas, 4)),
+            vjust = -0.5, color = "darkred", size = 4) +
+
+  # Interpretación textual dentro del gráfico
+  annotate("text", x = max_x - 4, y = max(probabilidades_poisson) * 0.95,
+           label = texto_interpretacion,
+           hjust = 0, vjust = 1, size = 4, color = "black", fontface = "italic")
+
+```
+
+c\) \[0.5 pts\] La concentraci´on de un contaminante se distribuye uniformemente en un intervalo de 0 a 20 millones. Una concentraci´on se considera t´oxica a partir de 8 millones. Determine la probabilidad de que al tomar una muestra la concentraci´on resulte t´oxica. Luego determine la probabilidad de que la concentraci´on sea de 10 millones.
+
+```{r}
+# Resolver y graficar el problema de concentración de contaminante con distribución uniforme
+
+# Cargar librería necesaria
+library(ggplot2)
+
+# Definir los límites de la distribución uniforme
+a <- 0  # Límite inferior (millones)
+b <- 20 # Límite superior (millones)
+
+# Función para interpretar el resultado
+interpretar_probabilidad <- function(umbral, prob) {
+  mensaje <- paste0("Para un umbral tóxico de ", umbral, " millones:\n")
+  
+  if (prob >= 0.75) {
+    mensaje <- paste0(mensaje, "- Existe una alta probabilidad (", round(prob, 4), 
+                      ") de que la concentración sea tóxica. Riesgo significativo.")
+  } else if (prob >= 0.4) {
+    mensaje <- paste0(mensaje, "- La probabilidad (", round(prob, 4), 
+                      ") indica un riesgo moderado de toxicidad.")
+  } else if (prob >= 0.1) {
+    mensaje <- paste0(mensaje, "- La probabilidad (", round(prob, 4), 
+                      ") sugiere un bajo riesgo de toxicidad.")
+  } else {
+    mensaje <- paste0(mensaje, "- La probabilidad (", round(prob, 4), 
+                      ") indica un riesgo muy bajo de toxicidad.")
+  }
+  
+  return(mensaje)
+}
+
+# Probabilidad de concentración tóxica a partir de 8 millones: P(X >= 8)
+prob_toxica_desde_8 <- (b - 8) / (b - a)
+message("La probabilidad de que la concentración resulte tóxica a partir de 8 millones (P(X >= 8)) es: ", round(prob_toxica_desde_8, 4))
+cat(interpretar_probabilidad(8, prob_toxica_desde_8), "\n\n")
+
+# Probabilidad de concentración tóxica a partir de 10 millones: P(X >= 10)
+prob_toxica_desde_10 <- (b - 10) / (b - a)
+message("La probabilidad de que la concentración resulte tóxica a partir de 10 millones (P(X >= 10)) es: ", round(prob_toxica_desde_10, 4))
+cat(interpretar_probabilidad(10, prob_toxica_desde_10), "\n\n")
+
+# Preparar datos para la gráfica
+x_valores <- seq(a, b, length.out = 100)
+y_valores <- dunif(x_valores, min = a, max = b)
+datos_grafico <- data.frame(Concentracion = x_valores, Densidad = y_valores)
+
+# Crear gráfico de la distribución uniforme con áreas sombreadas
+ggplot(datos_grafico, aes(x = Concentracion, y = Densidad)) +
+  geom_line(color = "blue", size = 1) +
+  geom_ribbon(aes(ymin = 0, ymax = Densidad), fill = "lightblue", alpha = 0.5) +
+  labs(title = paste0("Distribución Uniforme U(", a, ", ", b, ") - Concentración de Contaminante"),
+       x = "Concentración (millones)",
+       y = "Densidad de Probabilidad") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  scale_x_continuous(limits = c(a - 1, b + 1), breaks = seq(a, b, by = 5)) +
+
+  # Área P(X >= 8)
+  geom_ribbon(data = subset(datos_grafico, Concentracion >= 8),
+              aes(ymin = 0, ymax = Densidad), fill = "orange", alpha = 0.6) +
+  geom_vline(xintercept = 8, color = "darkorange", linetype = "dashed", size = 1) +
+  annotate("text", x = 8, y = dunif(8, min = a, max = b) * 0.5,
+           label = paste("P(X >= 8) =", round(prob_toxica_desde_8, 4)),
+           hjust = -0.1, color = "darkorange", size = 4) +
+
+  # Área P(X >= 10)
+  geom_ribbon(data = subset(datos_grafico, Concentracion >= 10),
+              aes(ymin = 0, ymax = Densidad), fill = "red", alpha = 0.7) +
+  geom_vline(xintercept = 10, color = "darkred", linetype = "dashed", size = 1) +
+  annotate("text", x = 10, y = dunif(10, min = a, max = b) * 0.5,
+           label = paste("P(X >= 10) =", round(prob_toxica_desde_10, 4)),
+           hjust = -0.1, color = "darkred", size = 4)
+
+# Conclusión general
+cat("\nConclusión:\n")
+cat("La concentración del contaminante sigue una distribución uniforme entre 0 y 20 millones.\n")
+cat("La probabilidad de que una muestra sea tóxica considerando un umbral de 8 millones es ", round(prob_toxica_desde_8, 4), ".\n")
+cat("Si el umbral se eleva a 10 millones, la probabilidad disminuye a ", round(prob_toxica_desde_10, 4), ".\n")
+cat("Esto indica que a medida que aumenta el nivel considerado tóxico, la probabilidad de que la concentración supere ese nivel disminuye linealmente.\n")
+
+```
